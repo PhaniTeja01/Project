@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: storyforge
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: ./
+    buildCommand: npm ci && npm run build
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=512"
+      - key: LLM_PROVIDER_URL
+        value: https://api.openai.com/v1/chat/completions
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: LLM_MAX_TOKENS
+        value: "600"
+      - key: LLM_TEMPERATURE
+        value: "0.8"
+

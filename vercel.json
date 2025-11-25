@@ -1,0 +1,30 @@
+{
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/$1"
+    }
+  ],
+  "env": {
+    "LLM_PROVIDER_URL": "@llm_provider_url",
+    "LLM_API_KEY": "@llm_api_key",
+    "LLM_MODEL": "@llm_model",
+    "LLM_MAX_TOKENS": "@llm_max_tokens",
+    "LLM_TEMPERATURE": "@llm_temperature"
+  }
+}
