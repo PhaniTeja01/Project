@@ -141,8 +141,10 @@ ${currentStoryCount >= 2 ? '' : 'CHOICES:\n1. [next choice]\n2. [alternative]\n3
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         if (response.status === 429) {
-          throw new Error('Rate limited. Too many requests. Please wait a moment and try again.');
+          const waitTime = errorData.message?.match(/\d+/)?.[0] || 'a few';
+          throw new Error(`Rate limited. Please wait ${waitTime} seconds before trying again.`);
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }

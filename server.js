@@ -15,20 +15,21 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Rate limiting
+// Rate limiting - OpenAI free tier is 3 requests per minute (20 seconds between requests)
 const requestTimestamps = {};
-const RATE_LIMIT_MS = 2000; // Wait 2 seconds between requests
+const RATE_LIMIT_MS = 20000; // Wait 20 seconds between requests to respect OpenAI's RPM limit
 
 function isRateLimited(clientId = 'default') {
   const now = Date.now();
   const lastRequest = requestTimestamps[clientId] || 0;
   
   if (now - lastRequest < RATE_LIMIT_MS) {
-    return true;
+    const secondsWait = Math.ceil((RATE_LIMIT_MS - (now - lastRequest)) / 1000);
+    return { limited: true, secondsWait };
   }
   
   requestTimestamps[clientId] = now;
-  return false;
+  return { limited: false };
 }
 
 // CORS configuration for production and development
@@ -142,10 +143,11 @@ app.post('/api/generate-story', async (req, res) => {
     const temperature = parseFloat(process.env.LLM_TEMPERATURE || '0.8');
 
     // Check rate limit
-    if (isRateLimited()) {
+    const rateLimitCheck = isRateLimited();
+    if (rateLimitCheck.limited) {
       return res.status(429).json({ 
-        error: 'Too many requests. Please wait a moment.',
-        message: 'Rate limited - try again in 2 seconds'
+        error: `Too many requests. Please wait ${rateLimitCheck.secondsWait} seconds.`,
+        message: `Rate limited - OpenAI free tier allows 3 requests per minute`
       });
     }
 
@@ -187,13 +189,14 @@ app.post('/api/generate-story', async (req, res) => {
 
         const data = await response.json();
 
-        // Handle rate limit (429) - wait and retry
+        // Handle rate limit (429) - exponential backoff
         if (response.status === 429) {
           lastError = data;
           retries--;
           if (retries > 0) {
-            console.log(`Rate limited. Retrying... (${retries} attempts left)`);
-            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+            const waitMs = (3 - retries) * 5000; // 5s, 10s delays
+            console.log(`Rate limited. Retrying in ${waitMs/1000}s... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
             continue;
           }
         }
@@ -216,6 +219,7 @@ app.post('/api/generate-story', async (req, res) => {
           
           return res.status(response.status).json(data);
         }
+
 
         // Transform OpenAI response to match our expected format
         const transformedResponse = {
